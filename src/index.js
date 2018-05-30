@@ -382,6 +382,47 @@ const create = ({
     };
 
     /**
+     * Update order
+     *
+     * @param {string} order.productId
+     * @return {Promise} Resolves to {status: 0, statusText: "success"}
+     */
+    const updateOrder = ({order, orderId}) => {
+        const {buySell, orderType, productId, size, timeType, price, stopPrice} = order;
+        log('updateOrder', {
+            buySell,
+            orderType,
+            productId,
+            size,
+            timeType,
+            price,
+            stopPrice,
+        });
+        log(session);
+
+        return fetch(
+            `${urls.tradingUrl}v5/order/${orderId};jsessionid=${session.id}?intAccount=${
+                session.account
+            }&sessionId=${session.id}`,
+            {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json;charset=UTF-8'},
+                body: JSON.stringify(order)
+            }
+        )
+            .then(res => res.json())
+            .then(function(res) {
+                if (res.status == 0 && res.statusText == 'success') {
+                    return true;
+                } else {
+                    throw Error('Update order failed');
+                }
+            });
+    };
+
+
+
+    /**
      * Check order
      *
      * @param {number} order.action - See Actions
@@ -458,6 +499,8 @@ const create = ({
     const setOrder = ({buySell, orderType, productId, size, timeType = TimeTypes.day, price, stopPrice}) =>
         checkOrder({buySell, orderType, productId, size, timeType, price, stopPrice}).then(confirmOrder);
 
+
+
     /**
      * Get multiple products by its IDs
      *
@@ -486,6 +529,7 @@ const create = ({
         getPortfolio,
         getAskBidPrice,
         setOrder,
+        updateOrder,
         deleteOrder,
         getOrders,
         getProductsByIds,
