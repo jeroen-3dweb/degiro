@@ -412,11 +412,8 @@ const create = ({
         )
             .then(res => res.json())
             .then(function(res) {
-                if (res.status == 0 && res.statusText == 'success') {
-                    return true;
-                } else {
-                    throw Error('Update order failed');
-                }
+                log(res);
+                return res;
             });
     };
 
