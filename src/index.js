@@ -387,7 +387,7 @@ const create = ({
      * @param {string} order.productId
      * @return {Promise} Resolves to {status: 0, statusText: "success"}
      */
-    const updateOrder = (orderId, {order}) => {
+    const updateOrder = (orderId, order) => {
         const {buySell, orderType, productId, size, timeType, price, stopPrice} = order;
         log('updateOrder', {
             buySell,
