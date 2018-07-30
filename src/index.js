@@ -273,7 +273,7 @@ const create = ({
      *
      * @return {Promise}
      */
-    const getTransactions = (days) => {
+    const getTransactions = (days = 10) => {
         let toDate = moment().format('DD/MM/YYYY');
         let fromDate = moment().subtract(days, 'days').format('DD/MM/YYYY');
         return getReportingData('transactions',{
