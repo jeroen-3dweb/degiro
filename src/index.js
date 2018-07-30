@@ -7,18 +7,20 @@ const omit = require('lodash/omit');
 const isNil = require('lodash/isNil');
 const fromPairs = require('lodash/fromPairs');
 const {lcFirst} = require('./utils');
+const moment = require('moment');
 
 const BASE_TRADER_URL = 'https://trader.degiro.nl';
 
 const create = ({
-    username = process.env.DEGIRO_USER,
-    password = process.env.DEGIRO_PASS,
-    oneTimePassword = process.env.DEGIRO_ONE_TIME_PASS,
-    sessionId = process.env.DEGIRO_SID,
-    account = +process.env.DEGIRO_ACCOUNT,
-    debug = !!process.env.DEGIRO_DEBUG,
-} = {}) => {
-    const log = debug ? (...s) => console.log(...s) : () => {};
+                    username = process.env.DEGIRO_USER,
+                    password = process.env.DEGIRO_PASS,
+                    oneTimePassword = process.env.DEGIRO_ONE_TIME_PASS,
+                    sessionId = process.env.DEGIRO_SID,
+                    account = +process.env.DEGIRO_ACCOUNT,
+                    debug = !!process.env.DEGIRO_DEBUG,
+                } = {}) => {
+    const log = debug ? (...s) => console.log(...s) : () => {
+    };
 
     const session = {
         id: sessionId,
@@ -44,7 +46,7 @@ const create = ({
     };
 
     /**
-     * Gets data
+     * Gets data from v5
      *
      * @return {Promise}
      */
@@ -54,6 +56,23 @@ const create = ({
         return fetch(
             `${urls.tradingUrl}v5/update/${session.account};jsessionid=${session.id}?${params}`
         ).then(res => res.json());
+    };
+
+    /**
+     * Gets data from v4
+     *
+     * https://trader.degiro.nl/reporting/secure/v4/transactions?orderId=&product=&fromDate=05%2F06%2F2018&toDate=30%2F07%2F2018&groupTransactionsByOrder=false&intAccount=1087561&sessionId=107C9F6E8935F948160211C16AC0035A.prod9
+     *
+     * @return {Promise}
+     */
+    const getReportingData = (endpoint, options = {}) => {
+        options['intAccount'] = session.account;
+        options['sessionId'] = session.id;
+        const params = querystring.stringify(options);
+        log('getData v4', params);
+
+        let url = `${urls.reportingUrl}v4/${endpoint}?${params}`;
+        return fetch(url).then(res => res.json());
     };
 
     /**
@@ -86,7 +105,7 @@ const create = ({
         return fetch(
             `https://degiro.quotecast.vwdservices.com/CORS/request_session?version=1.0.20170315&userToken=${
                 session.userToken
-            }`,
+                }`,
             {
                 method: 'POST',
                 headers: {Origin: 'https://trader.degiro.nl'},
@@ -181,7 +200,15 @@ const create = ({
      * @return {Promise}
      */
     const getOrders = () => {
-        return getData({orders: 0, historicalOrders: 0, transactions: 0}).then(data => {
+        let toDate = moment().format('DD/MM/YYYY');
+        let fromDate = moment().subtract(5, 'days').format('DD/MM/YYYY');
+        return getData({
+            orders: 0,
+            historicalOrders: 0,
+            transactions: 0,
+            fromDate: fromDate,
+            toDate: toDate
+        }).then(data => {
             if (
                 data.orders &&
                 Array.isArray(data.orders.value) &&
@@ -190,15 +217,15 @@ const create = ({
                 data.transactions &&
                 Array.isArray(data.transactions.value)
             ) {
-                const processOrders = function(orders) {
+                const processOrders = function (orders) {
                     var res = [];
 
-                    orders.forEach(function(order) {
+                    orders.forEach(function (order) {
                         var o = {
                             id: order.id,
                         };
 
-                        order.value.forEach(function(orderRow) {
+                        order.value.forEach(function (orderRow) {
                             if (orderRow.name == 'date') {
                                 if (orderRow.value.includes(':')) {
                                     o[orderRow.name] = new Date();
@@ -240,6 +267,36 @@ const create = ({
             throw Error('Bad result: ' + JSON.stringify(data));
         });
     };
+
+    /**
+     * Get transactions
+     *
+     * @return {Promise}
+     */
+    const getTransactions = (days) => {
+        let toDate = moment().format('DD/MM/YYYY');
+        let fromDate = moment().subtract(days, 'days').format('DD/MM/YYYY');
+        return getReportingData('transactions',{
+            fromDate: fromDate,
+            toDate: toDate,
+            groupTransactionsByOrder: false
+        }).then(data => {
+            if (
+
+                Array.isArray(data.data)
+            ) {
+                return {
+                    transactions:data.data
+                };
+            }
+            throw Error('Bad result: ' + JSON.stringify(data));
+        });
+    };
+
+
+
+
+
 
     /**
      * Get client info
@@ -290,7 +347,7 @@ const create = ({
             loginButtonUniversal: '',
             queryParams: {reason: 'session_expired'},
         };
- 
+
         if (oneTimePassword) {
             log('2fa token', oneTimePassword);
             url += '/totp';
@@ -299,13 +356,13 @@ const create = ({
 
         return sendLoginRequest(url, loginParams);
     }
- 
+
     const sendLoginRequest = (url, params) => {
         return fetch(url, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(params),
-            })
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(params),
+        })
             .then(res => {
                 const cookies = parseCookies(res.headers.get('set-cookie') || '');
                 session.id = cookies.JSESSIONID;
@@ -331,13 +388,13 @@ const create = ({
      * @return {Promise} Resolves to {data: Product[]}
      */
     const searchProduct = ({
-        text: searchText,
-        productType = ProductTypes.all,
-        sortColumn,
-        sortType,
-        limit = 7,
-        offset = 0,
-    }) => {
+                               text: searchText,
+                               productType = ProductTypes.all,
+                               sortColumn,
+                               sortType,
+                               limit = 7,
+                               offset = 0,
+                           }) => {
         const options = {
             searchText,
             productTypeId: productType,
@@ -351,7 +408,7 @@ const create = ({
         return fetch(
             `${urls.productSearchUrl}v5/products/lookup?intAccount=${session.account}&sessionId=${
                 session.id
-            }&${params}`
+                }&${params}`
         ).then(res => res.json());
     };
 
@@ -365,14 +422,14 @@ const create = ({
         return fetch(
             `${urls.tradingUrl}v5/order/${orderId};jsessionid=${session.id}?intAccount=${
                 session.account
-            }&sessionId=${session.id}`,
+                }&sessionId=${session.id}`,
             {
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json;charset=UTF-8'},
             }
         )
             .then(res => res.json())
-            .then(function(res) {
+            .then(function (res) {
                 if (res.status == 0 && res.statusText == 'success') {
                     return true;
                 } else {
@@ -403,7 +460,7 @@ const create = ({
         return fetch(
             `${urls.tradingUrl}v5/order/${orderId};jsessionid=${session.id}?intAccount=${
                 session.account
-            }&sessionId=${session.id}`,
+                }&sessionId=${session.id}`,
             {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json;charset=UTF-8'},
@@ -411,12 +468,11 @@ const create = ({
             }
         )
             .then(res => res.json())
-            .then(function(res) {
+            .then(function (res) {
                 log(res);
                 return res;
             });
     };
-
 
 
     /**
@@ -446,7 +502,7 @@ const create = ({
         return fetch(
             `${urls.tradingUrl}v5/checkOrder;jsessionid=${session.id}?intAccount=${
                 session.account
-            }&sessionId=${session.id}`,
+                }&sessionId=${session.id}`,
             {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json;charset=UTF-8'},
@@ -470,7 +526,7 @@ const create = ({
         return fetch(
             `${urls.tradingUrl}v5/order/${confirmationId};jsessionid=${session.id}?intAccount=${
                 session.account
-            }&sessionId=${session.id}`,
+                }&sessionId=${session.id}`,
             {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json;charset=UTF-8'},
@@ -495,7 +551,6 @@ const create = ({
      */
     const setOrder = ({buySell, orderType, productId, size, timeType = TimeTypes.day, price, stopPrice}) =>
         checkOrder({buySell, orderType, productId, size, timeType, price, stopPrice}).then(confirmOrder);
-
 
 
     /**
@@ -529,6 +584,7 @@ const create = ({
         updateOrder,
         deleteOrder,
         getOrders,
+        getTransactions,
         getProductsByIds,
         getClientInfo,
         updateConfig,

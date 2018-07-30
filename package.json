@@ -6,16 +6,20 @@
   "author": "Pedro Ladaria <pedro.ladaria@gmail.com>",
   "scripts": {
     "lint": "eslint ./src",
-    "test": "echo 'no tests'",
+    "test": "mocha",
     "prettier": "prettier --write --no-bracket-spacing --trailing-comma es5 --single-quote --list-different --tab-width 4 --print-width 120 ./src/**/*.js"
   },
   "dependencies": {
     "cookie": "^0.3.1",
+    "dotenv": "^6.0.0",
     "lodash": "^4.17.5",
+    "moment": "^2.22.2",
     "node-fetch": "^2.0.0"
   },
   "devDependencies": {
+    "chai": "^4.1.2",
     "eslint": "^4.5.0",
+    "mocha": "^5.2.0",
     "prettier": "^1.4.4"
   },
   "publishConfig": {
