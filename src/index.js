@@ -39,10 +39,10 @@ const create = ({
     };
 
     const checkSuccess = res => {
-        if (res.status !== 0) {
-            throw Error(res.message);
-        }
-        return res;
+        // if (res.status !== 0) {
+        //     throw Error(res.message);
+        // }
+        return res.data;
     };
 
     /**
